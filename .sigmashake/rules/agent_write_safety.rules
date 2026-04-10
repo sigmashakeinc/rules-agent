@@ -1,0 +1,61 @@
+# agent_write_safety.rules
+# Technology: agent | Capability: write
+
+rule agent-prevent-eval-exec {
+  enabled true
+  priority 90
+  severity error
+  DENY write
+  IF path GLOB "**/*.py" AND content LINE_CONTAINS "eval("
+  OR path GLOB "**/*.py" AND content LINE_CONTAINS "exec("
+  MESSAGE "Executing raw agent output via eval() or exec() leads to critical arbitrary code execution vulnerabilities."
+}
+
+rule agent-prevent-os-system {
+  enabled true
+  priority 90
+  severity error
+  DENY write
+  IF path GLOB "**/*.py" AND content LINE_CONTAINS "os.system("
+  OR path GLOB "**/*.py" AND content LINE_CONTAINS "subprocess.Popen(" AND content LINE_CONTAINS "shell=True"
+  OR path GLOB "**/*.py" AND content LINE_CONTAINS "subprocess.call(" AND content LINE_CONTAINS "shell=True"
+  MESSAGE "Using os.system or subprocess with shell=True with AI agent output can lead to command injection."
+}
+
+rule agent-prevent-hardcoded-keys {
+  enabled true
+  priority 85
+  severity error
+  DENY write
+  IF path GLOB "**/*.py" AND content LINE_REGEX "(?i)(api[_-]?key|secret|token)[\"'\s]*=[\s]*['\"][a-zA-Z0-9_\-]{16,}['\"]"
+  MESSAGE "Hardcoding API keys or secrets in agent scripts or outputs is a security risk. Use environment variables instead."
+}
+
+rule agent-prevent-prompt-injection {
+  enabled true
+  priority 80
+  severity warning
+  ASK write
+  IF path GLOB "**/*.py" AND content LINE_CONTAINS "system_prompt" AND content LINE_CONTAINS "user_input"
+  MESSAGE "Potential prompt injection vulnerability. Ensure user input is not directly interpolated into system prompts without escaping or bounding."
+  PROMPT "Are you sure this prompt construction is safe from injection?"
+}
+
+rule agent-enforce-dependency-hashes {
+  enabled true
+  priority 75
+  severity warning
+  ASK write
+  IF path GLOB "**/requirements.txt" AND content LINE_CONTAINS "==" AND content NOT LINE_CONTAINS "--hash="
+  MESSAGE "AI agents can hallucinate dependencies. Pinning dependencies with hashes in requirements.txt is recommended to prevent typosquatting/malicious package execution."
+  PROMPT "Allow dependency without a hash?"
+}
+
+rule agent-enforce-google-style {
+  enabled true
+  priority 50
+  severity warning
+  LOG write
+  IF path GLOB "**/*.py" AND content LINE_CONTAINS "import *"
+  MESSAGE "Google Python Style Guide prohibits wildcard imports (import *). Please use explicit imports."
+}

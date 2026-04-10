@@ -1,0 +1,66 @@
+# agent_any_efficiency.rules — AI agent efficiency and cost controls.
+# Technology: agent | Capability: any
+# Covers: head/tail substitution, package installs, background processes,
+# temp file hygiene, and agent tool cost logging.
+
+rule no-head-tail-use-read {
+  enabled true
+  priority 80
+  severity warning
+  FORCE execution
+  IF command STARTS_WITH "head "
+  OR command STARTS_WITH "tail "
+  OR command REGEX "^head -"
+  OR command REGEX "^tail -"
+  SUBSTITUTE "Use the Read tool with offset and limit parameters instead of 'head' or 'tail'. Example: Read file_path with limit=20 for head, or offset=N for tail."
+  MESSAGE "Use the Read tool with offset/limit instead of 'head' or 'tail'."
+}
+
+rule ask-package-install {
+  enabled true
+  priority 75
+  severity warning
+  ASK execution
+  IF command REGEX "^pip install "
+  OR command REGEX "^pip3 install "
+  OR command REGEX "^npm install "
+  OR command REGEX "^bun add "
+  OR command REGEX "^yarn add "
+  OR command REGEX "^cargo add "
+  OR command REGEX "^go get "
+  MESSAGE "Package installation modifies the environment. Confirm the package name is correct and the install is intentional — typosquatted package names are a common attack vector."
+  PROMPT "Is this the correct package name? Verify the exact spelling at npmjs.com or pypi.org before installing. Is this a dev dependency?"
+}
+
+rule ask-write-temp-root {
+  enabled true
+  priority 75
+  severity warning
+  ASK write
+  IF path GLOB "*.log" AND path NOT CONTAINS "/"
+  OR path GLOB "*.tmp" AND path NOT CONTAINS "/"
+  OR path GLOB "*.bak" AND path NOT CONTAINS "/"
+  OR path GLOB "debug_*" AND path NOT CONTAINS "/"
+  MESSAGE "Writing a temporary or debug file to the repo root. These files are frequently committed by accident and clutter the working tree."
+  PROMPT "Should this temp file be written to /tmp or a .gitignored directory instead of the repo root?"
+}
+
+rule log-background-agent-process {
+  enabled true
+  priority 70
+  severity info
+  LOG execution
+  IF command REGEX "\\s+&\\s*$"
+  OR command STARTS_WITH "nohup "
+  OR command CONTAINS "& disown"
+  MESSAGE "Background process started. Background jobs started by an agent are easy to lose track of — ensure cleanup is handled when the session ends."
+}
+
+rule log-agent-tool-invocation {
+  enabled true
+  priority 60
+  severity info
+  LOG any
+  IF tool EQUALS "Agent"
+  MESSAGE "Sub-agent spawned. Each agent invocation consumes significant tokens. Prefer direct tools (Read, Grep, Glob, Edit) for focused lookups — reserve agents for tasks requiring multiple sequential decisions."
+}

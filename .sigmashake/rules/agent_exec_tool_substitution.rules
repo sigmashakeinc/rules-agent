@@ -1,0 +1,62 @@
+# agent_exec_tool_substitution.rules — Redirect shell commands to native agent tools.
+# Technology: agent | Capability: exec
+# When an AI agent uses shell commands for file operations, redirect to the
+# equivalent built-in tool. This saves tokens, avoids shell escaping issues,
+# and gives the user cleaner diffs to review.
+
+rule no-cat-use-read {
+  enabled true
+  priority 85
+  severity warning
+  FORCE execution
+  IF command STARTS_WITH "cat "
+  OR command REGEX "^cat$"
+  SUBSTITUTE "Use the Read tool instead of 'cat'. It provides line numbers, offset/limit support, and structured output without spawning a shell process."
+  MESSAGE "Use the Read tool instead of 'cat' for reading files."
+}
+
+rule no-find-use-glob {
+  enabled true
+  priority 85
+  severity warning
+  FORCE execution
+  IF command STARTS_WITH "find "
+  OR command REGEX "^find$"
+  SUBSTITUTE "Use the Glob tool instead of 'find'. It supports glob patterns (**/*.ts), is faster than shell find, and returns structured results."
+  MESSAGE "Use the Glob tool instead of 'find' for locating files by pattern."
+}
+
+rule no-grep-use-grep-tool {
+  enabled true
+  priority 85
+  severity warning
+  FORCE execution
+  IF command STARTS_WITH "grep "
+  OR command STARTS_WITH "rg "
+  OR command STARTS_WITH "grep -"
+  SUBSTITUTE "Use the Grep tool instead of shell grep/rg. It supports regex, glob file filters, context lines, and content/files-only output modes without a subprocess."
+  MESSAGE "Use the Grep tool instead of 'grep' or 'rg' for searching file contents."
+}
+
+rule no-sed-inplace-use-edit {
+  enabled true
+  priority 85
+  severity warning
+  FORCE execution
+  IF command REGEX "sed -[^ ]*i"
+  OR command CONTAINS "sed --in-place"
+  SUBSTITUTE "Use the Edit tool instead of 'sed -i'. It shows a clean diff, handles encoding correctly, and is idempotent — it will error if the old string isn't found."
+  MESSAGE "Use the Edit tool instead of 'sed -i' for in-place file edits."
+}
+
+rule no-echo-to-file-use-write {
+  enabled true
+  priority 80
+  severity warning
+  FORCE execution
+  IF command REGEX "echo .* >"
+  OR command REGEX "echo .* >>"
+  OR command REGEX "printf .* >"
+  SUBSTITUTE "Use the Write tool instead of 'echo >' or 'printf >' for creating/overwriting files. It handles encoding, shows the content for review, and is atomic."
+  MESSAGE "Use the Write tool instead of 'echo >' for writing file contents."
+}

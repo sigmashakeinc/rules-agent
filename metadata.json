@@ -1,0 +1,3 @@
+{
+  "description": "AI agent efficiency and cost-reduction rules. These rules prevent context-bloat and redirect shell commands to native agent tools to reduce token costs by 30-50%."
+}
