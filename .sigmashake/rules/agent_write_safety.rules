@@ -35,20 +35,18 @@ rule agent-prevent-prompt-injection {
   enabled true
   priority 80
   severity warning
-  ASK write
+  LOG write
   IF path GLOB "**/*.py" AND content LINE_CONTAINS "system_prompt" AND content LINE_CONTAINS "user_input"
   MESSAGE "Potential prompt injection vulnerability. Ensure user input is not directly interpolated into system prompts without escaping or bounding."
-  PROMPT "Are you sure this prompt construction is safe from injection?"
 }
 
 rule agent-enforce-dependency-hashes {
   enabled true
   priority 75
   severity warning
-  ASK write
+  LOG write
   IF path GLOB "**/requirements.txt" AND content LINE_CONTAINS "==" AND content NOT LINE_CONTAINS "--hash="
   MESSAGE "AI agents can hallucinate dependencies. Pinning dependencies with hashes in requirements.txt is recommended to prevent typosquatting/malicious package execution."
-  PROMPT "Allow dependency without a hash?"
 }
 
 rule agent-enforce-google-style {

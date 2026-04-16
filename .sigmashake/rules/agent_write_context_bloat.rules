@@ -9,22 +9,20 @@ rule ask-hook-echo-on-allow {
   enabled true
   priority 75
   severity warning
-  ASK write
+  LOG write
   IF path GLOB "**/hooks/*.sh" AND content LINE_CONTAINS "echo" AND content CONTAINS "\"allow\""
   OR path GLOB "**/hooks/*.sh" AND content LINE_CONTAINS "echo" AND content CONTAINS "'allow'"
   MESSAGE "Hook script echoes on every allow decision. At ~10 tokens per tool call, this costs 500-1,500 tokens per session with no agent value — agents do not need confirmation that a tool was allowed."
-  PROMPT "Does this hook echo output on every allowed tool call (not just blocks)? If yes, remove the allow-path echo — only block/force/ask decisions need agent-visible output."
 }
 
 rule ask-claudemd-duplicate-table {
   enabled true
   priority 50
   severity warning
-  ASK write
+  LOG write
   IF path ENDS_WITH "CLAUDE.md" AND content CONTAINS "| Skill | Description |"
   OR path ENDS_WITH "CLAUDE.md" AND content CONTAINS "| Script | What it does |"
   MESSAGE "Writing a large reference table to a CLAUDE.md. These files are loaded into every conversation — duplicating tables across CLAUDE.md files wastes hundreds of tokens per conversation."
-  PROMPT "Is this table already present in another CLAUDE.md in this repo? Maintain it in one canonical location and reference it from others."
 }
 
 rule log-skill-file-write {

@@ -36,13 +36,12 @@ rule ask-write-temp-root {
   enabled true
   priority 75
   severity warning
-  ASK write
+  LOG write
   IF path GLOB "*.log" AND path NOT CONTAINS "/"
   OR path GLOB "*.tmp" AND path NOT CONTAINS "/"
   OR path GLOB "*.bak" AND path NOT CONTAINS "/"
   OR path GLOB "debug_*" AND path NOT CONTAINS "/"
   MESSAGE "Writing a temporary or debug file to the repo root. These files are frequently committed by accident and clutter the working tree."
-  PROMPT "Should this temp file be written to /tmp or a .gitignored directory instead of the repo root?"
 }
 
 rule log-background-agent-process {
