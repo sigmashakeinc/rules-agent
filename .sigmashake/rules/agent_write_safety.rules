@@ -27,7 +27,7 @@ rule agent-prevent-hardcoded-keys {
   priority 85
   severity error
   DENY write
-  IF path GLOB "**/*.py" AND content LINE_REGEX "(?i)(api[_-]?key|secret|token)[\"'\s]*=[\s]*['\"][a-zA-Z0-9_\-]{16,}['\"]"
+  IF path GLOB "**/*.py" AND content LINE_REGEX "(?i)(api[_-]?key|secret|token)\\s*=\\s*['\"][A-Za-z0-9_\\-]{16,}['\"]"
   MESSAGE "Hardcoding API keys or secrets in agent scripts or outputs is a security risk. Use environment variables instead."
 }
 
@@ -56,4 +56,57 @@ rule agent-enforce-google-style {
   LOG write
   IF path GLOB "**/*.py" AND content LINE_CONTAINS "import *"
   MESSAGE "Google Python Style Guide prohibits wildcard imports (import *). Please use explicit imports."
+}
+
+rule agent-langchain-secrets-from-env {
+  enabled true
+  priority 90
+  severity error
+  DENY write
+  IF path GLOB "**/*.py" AND content LINE_CONTAINS "secrets_from_env=True"
+  OR path GLOB "**/*.py" AND content LINE_CONTAINS "loads(" AND content LINE_CONTAINS "secrets_from_env"
+  MESSAGE "RISK: LangChain CVE-2025-68664 (LangGrinch, CVSS 9.3) — dumps/loads with secrets_from_env=True allows prompt-injected LLM output to exfiltrate env-var secrets via unescaped 'lc' keys. FIX: upgrade langchain-core >= 0.3.81 (or >= 1.2.5) and pass secrets_from_env=False when deserializing untrusted payloads."
+}
+
+rule agent-prevent-pickle-load {
+  enabled true
+  priority 90
+  severity error
+  DENY write
+  IF path GLOB "**/*.py" AND content LINE_CONTAINS "pickle.load("
+  OR path GLOB "**/*.py" AND content LINE_CONTAINS "pickle.loads("
+  OR path GLOB "**/*.py" AND content LINE_CONTAINS "cloudpickle.load"
+  MESSAGE "RISK: pickle/cloudpickle deserialization executes arbitrary code (CVE-2025-1716 bypasses picklescan; CVE-2026-0773 cloudpickle RCE; malicious models on Hugging Face routinely ship pickle payloads). FIX: load model weights via safetensors.load_file or torch.load(path, weights_only=True) on torch >= 2.6 (post CVE-2025-32434), never raw pickle on untrusted input."
+}
+
+rule agent-prevent-yaml-load {
+  enabled true
+  priority 85
+  severity error
+  DENY write
+  IF path GLOB "**/*.py" AND content LINE_REGEX "yaml\\.load\\s*\\([^)]*\\)$"
+  OR path GLOB "**/*.py" AND content LINE_CONTAINS "yaml.unsafe_load("
+  OR path GLOB "**/*.py" AND content LINE_CONTAINS "Loader=yaml.Loader"
+  MESSAGE "RISK: yaml.load / yaml.unsafe_load / Loader=yaml.Loader on agent-authored YAML allows arbitrary Python object construction and RCE via !!python/object tags. FIX: use yaml.safe_load() (or yaml.load(data, Loader=yaml.SafeLoader)) for all config, prompt, and tool-definition files."
+}
+
+rule agent-jinja2-autoescape-off {
+  enabled true
+  priority 80
+  severity error
+  DENY write
+  IF path GLOB "**/*.py" AND content LINE_CONTAINS "Environment(" AND content LINE_CONTAINS "autoescape=False"
+  OR path GLOB "**/*.py" AND content LINE_CONTAINS "Template(" AND content LINE_CONTAINS "from_string"
+  MESSAGE "RISK: Jinja2 Environment with autoescape=False (or Template.from_string on LLM output) enables SSTI — the LangGrinch chain ends in Jinja2 RCE via trusted-namespace class instantiation. FIX: construct jinja2.Environment with autoescape=select_autoescape() and never render templates whose source string contains agent/user input."
+}
+
+rule agent-mcp-hidden-instruction {
+  enabled true
+  priority 85
+  severity warning
+  ASK write
+  IF path GLOB "**/mcp*/**/*.json" AND content LINE_REGEX "(?i)<important>|<!--\\s*system|ignore (previous|all) instructions"
+  OR path GLOB "**/*mcp*.py" AND content LINE_REGEX "(?i)description\\s*=\\s*['\"][^'\"]*<important>"
+  MESSAGE "RISK: MCP tool descriptions containing hidden directives ('<IMPORTANT>', system-style comments, 'ignore previous instructions') are the canonical tool-poisoning vector (Invariant Labs 2025 — WhatsApp/GitHub MCP exfiltration). FIX: keep tool descriptions to plain user-visible prose and pin MCP server versions with integrity hashes so definitions can't mutate post-install."
+  PROMPT "This tool description contains hidden-instruction markers. Confirm this is intentional and the MCP server is trusted, or remove the embedded directives before saving."
 }
